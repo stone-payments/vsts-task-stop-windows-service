@@ -57,5 +57,26 @@ Describe "Main" {
             { Main } | Should -Throw "Required parameter 'SkipWhenServiceDoesNotExists' cannot be empty."
         }
     }
+
+    Context "Killing service" {
+
+        It "Failing to stop service, it should be killed." {
+            # Arrange
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "ServiceName" } -MockWith { return "some_name" }
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return "true" }
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "Timeout" } -MockWith { return "some_to" }
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "SkipWhenServiceDoesNotExists" } -MockWith { return "skip" }
+            Mock Test-ServiceExists -MockWith { return $true }
+            Mock Stop-WindowsService -MockWith { return $false }
+            Mock Kill-WindowsService -MockWith {}
+
+            # Act
+            Main
+
+            # Assert
+            Assert-MockCalled Kill-WindowsService -ParameterFilter { $serviceName -eq "some_name" }
+
+        }
+    }
 }
 

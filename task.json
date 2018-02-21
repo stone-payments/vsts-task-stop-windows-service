@@ -1,0 +1,68 @@
+{
+  "id": "2f321c10-7d4d-46d0-b3a1-f78cc01b8a7c",
+  "name": "StopWindowsService",
+  "friendlyName": "Stop Windows Service",
+  "description": "Stop a Windows Service that is running on the same machine as the agent.",
+  "author": "douglasquintanilha",
+  "helpMarkDown": "Stop a Windows Service that is running on the same machine as the agent.",
+  "category": "Utility",
+  "visibility": [
+    "Release"
+  ],
+  "demands": [],
+  "version": {
+    "Major": "0",
+    "Minor": "0",
+    "Patch": "5"
+  },
+  "minimumAgentVersion": "1.95.0",
+  "instanceNameFormat": "Stop Service $(ServiceName)",
+  "groups":[
+    {
+      "name" : "Advanced",
+      "displayName": "Advanced Options",
+      "isExpanded": false
+    }
+  ],
+  "inputs": [
+    {
+      "name": "ServiceName",
+      "type": "string",
+      "label": "Service Name",
+      "defaultValue": "",
+      "required": true,
+      "helpMarkDown": "The name of the service that will be stopped."
+    },
+    {
+      "name": "Timeout",
+      "type": "string",
+      "label": "Timeout",
+      "defaultValue": "60",
+      "required": true,
+      "helpMarkDown": "How many seconds the task should wait after sending the stop command."
+    },
+    {
+      "name": "SkipWhenServiceDoesNotExists",
+      "type": "boolean",
+      "label": "Skip task if the service does not exist.",
+      "defaultValue": false,      
+      "required": false,
+      "groupName": "Advanced",
+      "helpMarkDown": "Select this option to skip this task if the service does not exist on the machine. It's useful to leave this on for the first deploy."
+    },
+    {
+      "name": "KillService",
+      "type": "boolean",
+      "label": "Kill service if stop fails",
+      "defaultValue": true,      
+      "required": false,
+      "groupName": "Advanced",
+      "helpMarkDown": "Select this option for force terminate the service if the stop fails."
+    }
+  ],
+  "execution": {
+    "PowerShell3": {
+      "target": "StopWindowsService.ps1"
+    }
+  }
+}

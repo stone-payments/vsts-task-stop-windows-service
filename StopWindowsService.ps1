@@ -52,6 +52,20 @@ function Main () {
         $timeout = Get-VstsInput -Name "Timeout" -Require
         $SkipWhenServiceDoesNotExists = Get-VstsInput -Name "SkipWhenServiceDoesNotExists" -Require
 
+        # Validate required fields.
+        if(-not $serviceName){
+            throw "Required parameter 'ServiceName' cannot be empty."
+        }
+        if(-not $shouldKillService){
+            throw "Required parameter 'KillService' cannot be empty."
+        }
+        if(-not $timeout){
+            throw "Required parameter 'Timeout' cannot be empty."
+        }
+        if(-not $SkipWhenServiceDoesNotExists){
+            throw "Required parameter 'SkipWhenServiceDoesNotExists' cannot be empty."
+        }
+
         if(Test-ServiceExists $serviceName){
             $serviceStopped = Stop-WindowsService -serviceName $serviceName -timeout $timeout
 

@@ -13,7 +13,7 @@ Useful to use when working with Deployment Groups in VSTS.
 To run unit tests execute the following powershell command at the test directory:
 
 ``` powershell
-Invoke-Pester
+Invoke-Pester -Script .\tests\StopWindowsService.Tests.ps1 -CodeCoverage .\StopWindowsService.ps1
 ```
 
 ## Build and Publish

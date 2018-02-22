@@ -33,7 +33,7 @@ function Kill-WindowsService ($serviceName) {
 
 function Test-ServiceExists($serviceName) {
     $service = Get-Service $serviceName
-
+    
     if($service){
         Write-Host "Service $($service.name) was found."
         return $True
@@ -51,30 +51,19 @@ function Main () {
         $shouldKillService = Get-VstsInput -Name "KillService" -Require
         $timeout = Get-VstsInput -Name "Timeout" -Require
         $SkipWhenServiceDoesNotExists = Get-VstsInput -Name "SkipWhenServiceDoesNotExists" -Require
-
-        # Validate required fields.
-        if(-not $serviceName){
-            throw "Required parameter 'ServiceName' cannot be empty."
-        }
-        if(-not $shouldKillService){
-            throw "Required parameter 'KillService' cannot be empty."
-        }
-        if(-not $timeout){
-            throw "Required parameter 'Timeout' cannot be empty."
-        }
-        if(-not $SkipWhenServiceDoesNotExists){
-            throw "Required parameter 'SkipWhenServiceDoesNotExists' cannot be empty."
-        }
-
+              
         if(Test-ServiceExists $serviceName){
             $serviceStopped = Stop-WindowsService -serviceName $serviceName -timeout $timeout
-
-            if((-not $serviceStopped) -and $shouldKillService){
-                Kill-WindowsService $serviceName
+            
+            if($serviceStopped){
+                Write-Host "Service $serviceName stopped successfully."
             }else{
-                throw "The service $serviceName could not be stopped and kill service option was disabled."
+                if($shouldKillService){                    
+                    Kill-WindowsService $serviceName
+                }else{
+                    throw "The service $serviceName could not be stopped and kill service option was disabled."
+                }
             }
-
         }else{
             if($SkipWhenServiceDoesNotExists){
                 Write-Host "The service $serviceName does not exist. Skipping this task."         

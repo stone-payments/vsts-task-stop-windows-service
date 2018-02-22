@@ -6,61 +6,16 @@ $srcDir = "$here\.."
 
 # Import vsts sdk.
 $vstsSdkPath = Join-Path $PSScriptRoot ..\ps_modules\VstsTaskSdk\VstsTaskSdk.psm1 -Resolve
-Import-Module -Name $vstsSdkPath -Prefix Vsts -ArgumentList @{ NonInteractive = $false } -Force
+Import-Module -Name $vstsSdkPath -Prefix Vsts -ArgumentList @{ NonInteractive = $true } -Force
 
 Describe "Main" {
     # General mocks needed to control flow and avoid throwing errors.
     Mock Trace-VstsEnteringInvocation -MockWith {}
     Mock Trace-VstsLeavingInvocation -MockWith {}
 
-    Context "Input validation" {
-        Mock Get-VstsInput -MockWith { return "" }
-        Mock New-Item -MockWith {}
-        
-        It "Given empty ServiceName, task should be aborted" {
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return "killornot" }
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "Timeout" } -MockWith { return "some_timeout" }
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "SkipWhenServiceDoesNotExists" } -MockWith { return "some_action" }
-            # Force input read to return empty string.
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "ServiceName" } -MockWith { return "" }
-            # Call function expecting exception.
-            { Main } | Should -Throw "Required parameter 'ServiceName' cannot be empty."
-        }
-
-        It "Given empty KillService parameter, task should be aborted" {
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "ServiceName" } -MockWith { return "some_sn" }
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "Timeout" } -MockWith { return "some_timeout" }
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "SkipWhenServiceDoesNotExists" } -MockWith { return "some_action" }
-            # Force input read to return empty string.
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return "" }
-            # Call function expecting exception.
-            { Main } | Should -Throw "Required parameter 'KillService' cannot be empty."
-        }
-
-        It "Given empty Timeout parameter, task should be aborted" {
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "ServiceName" } -MockWith { return "some_sn" }
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return "some_ks" }
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "SkipWhenServiceDoesNotExists" } -MockWith { return "some_action" }
-            # Force input read to return empty string.
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "Timeout" } -MockWith { return "" }
-            # Call function expecting exception.
-            { Main } | Should -Throw "Required parameter 'Timeout' cannot be empty."
-        }
-
-        It "Given empty SkipWhenServiceDoesNotExists parameter, task should be aborted" {
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "ServiceName" } -MockWith { return "some_sn" }
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return "some_ks" }
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "Timeout" } -MockWith { return "some_timeout" }
-            # Force input read to return empty string.
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "SkipWhenServiceDoesNotExists" } -MockWith { return "" }
-            # Call function expecting exception.
-            { Main } | Should -Throw "Required parameter 'SkipWhenServiceDoesNotExists' cannot be empty."
-        }
-    }
-
     Context "Killing service" {
 
-        It "Failing to stop service, it should be killed." {
+        It "Failing to stop service, and kill flag is true, it should be killed." {
             # Arrange
             Mock Get-VstsInput -ParameterFilter { $Name -eq "ServiceName" } -MockWith { return "some_name" }
             Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return "true" }
@@ -75,6 +30,21 @@ Describe "Main" {
 
             # Assert
             Assert-MockCalled Kill-WindowsService -ParameterFilter { $serviceName -eq "some_name" }
+
+        }
+
+        It "Failing to stop service and kill flag is false, should throw exception" {
+            # Arrange
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "ServiceName" } -MockWith { return "some_name" } 
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return $false }
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "Timeout" } -MockWith { return "some_to" }
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "SkipWhenServiceDoesNotExists" } -MockWith { return "skip" }
+            Mock Test-ServiceExists -MockWith { return $true } 
+            Mock Stop-WindowsService -MockWith { return $false } 
+
+            # Act
+            # Assert
+            { Main } | Should -Throw "The service some_name could not be stopped and kill service option was disabled."
 
         }
     }

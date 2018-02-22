@@ -15,10 +15,26 @@ Describe "Main" {
 
     Context "Killing service" {
 
+        It "When trying to stop service, it should be stopped." {
+            # Arrange
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "ServiceName" } -MockWith { return "some_name" } 
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return $false }
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "Timeout" } -MockWith { return "some_to" }
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "SkipWhenServiceDoesNotExists" } -MockWith { return "skip" }
+            Mock Test-ServiceExists -MockWith { return $true } 
+            Mock Stop-WindowsService -MockWith { return $true } 
+
+            # Act
+            Main
+
+            # Assert
+            Assert-MockCalled Stop-WindowsService -ParameterFilter { ($serviceName -eq "some_name") -and ($timeout -eq "some_to") }
+        }
+
         It "Failing to stop service, and kill flag is true, it should be killed." {
             # Arrange
             Mock Get-VstsInput -ParameterFilter { $Name -eq "ServiceName" } -MockWith { return "some_name" }
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return "true" }
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return $true }
             Mock Get-VstsInput -ParameterFilter { $Name -eq "Timeout" } -MockWith { return "some_to" }
             Mock Get-VstsInput -ParameterFilter { $Name -eq "SkipWhenServiceDoesNotExists" } -MockWith { return "skip" }
             Mock Test-ServiceExists -MockWith { return $true }
@@ -45,7 +61,6 @@ Describe "Main" {
             # Act
             # Assert
             { Main } | Should -Throw "The service some_name could not be stopped and kill service option was disabled."
-
         }
     }
 }

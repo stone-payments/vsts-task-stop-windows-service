@@ -32,12 +32,12 @@ function Kill-WindowsService ($serviceName) {
 }
 
 function Test-ServiceExists($serviceName) {
-    $service = Get-Service $serviceName
     
-    if($service){
+    try{
+        $service = Get-Service $serviceName
         Write-Host "Service $($service.name) was found."
         return $True
-    }else{        
+    }catch{
         return $False
     }
 }

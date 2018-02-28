@@ -62,6 +62,35 @@ Describe "Main" {
             # Assert
             { Main } | Should -Throw "The service some_name could not be stopped and kill service option was disabled."
         }
+
+        It "When the service does not exists on the target machine and the skip flag is enabled, it should succeed showing a message" {
+            # Arrange
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "ServiceName" } -MockWith { return "some_name" } 
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return $false }
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "Timeout" } -MockWith { return "some_to" }
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "SkipWhenServiceDoesNotExists" } -MockWith { return $true }
+            Mock Test-ServiceExists -MockWith { return $false } 
+            Mock Write-Host -MockWith { }
+            # Act
+            Main
+            # Assert
+            Assert-MockCalled Write-Host -ParameterFilter { $Object -eq "The service some_name does not exist. Skipping this task."} -Scope It
+
+        }
+
+        It "When the service does not exist on the target machine and the skip flag is disabled, it should fail and throw an exception"{
+            # Arrange
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "ServiceName" } -MockWith { return "some_name" } 
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return $false }
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "Timeout" } -MockWith { return "some_to" }
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "SkipWhenServiceDoesNotExists" } -MockWith { return $false }
+            Mock Test-ServiceExists -MockWith { return $false } 
+
+            # Act
+            # Assert
+            { Main } | Should -Throw "The service some_name does not exist. Please check the service name on the task configuration."
+            
+        }
     }
 }
 

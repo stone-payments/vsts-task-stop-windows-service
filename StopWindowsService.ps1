@@ -51,26 +51,29 @@ function Main () {
         $shouldKillService = Get-VstsInput -Name "KillService" -Require
         $timeout = Get-VstsInput -Name "Timeout" -Require
         $SkipWhenServiceDoesNotExists = Get-VstsInput -Name "SkipWhenServiceDoesNotExists" -Require
-              
-        if(Test-ServiceExists $serviceName){
-            $serviceStopped = Stop-WindowsService -serviceName $serviceName -timeout $timeout
+               
+        if(-not (Test-ServiceExists $serviceName)){
             
-            if($serviceStopped){
-                Write-Host "Service $serviceName stopped successfully."
-            }else{
-                if($shouldKillService){                    
-                    Kill-WindowsService $serviceName
-                }else{
-                    throw "The service $serviceName could not be stopped and kill service option was disabled."
-                }
-            }
-        }else{
             if($SkipWhenServiceDoesNotExists){
-                Write-Host "The service $serviceName does not exist. Skipping this task."         
+                Write-Host "The service $serviceName does not exist. Skipping this task."
+                return
             }else{
                 throw "The service $serviceName does not exist. Please check the service name on the task configuration."
+            }            
+        }
+
+        $serviceStopped = Stop-WindowsService -serviceName $serviceName -timeout $timeout
+            
+        if($serviceStopped){
+            Write-Host "Service $serviceName stopped successfully."
+        }else{
+            if($shouldKillService){                    
+                Kill-WindowsService $serviceName
+            }else{
+                throw "The service $serviceName could not be stopped and kill service option was disabled."
             }
-        }        
+        }
+        
         
     } finally {
         Trace-VstsLeavingInvocation $MyInvocation

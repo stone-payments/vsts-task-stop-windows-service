@@ -6,7 +6,7 @@ function Stop-WindowsService($serviceName, $timeout) {
     Stop-Service $service -Force
     try{
         Write-Host "Stop timeout: $timeout"
-        $service.WaitForStatus($status, $timeout)
+        $service.WaitForStatus($status, $timeout) | Out-Null
         return $True
     }catch{
         Write-Host "Timeout reached."            

@@ -94,3 +94,23 @@ Describe "Main" {
     }
 }
 
+Describe "Stop-WindowsService" {
+    $serviceName = "MyService"
+    $timeout = "30"
+    Context "When service stopped within timeout" {        
+        Mock Get-Service { 
+            New-Module -AsCustomObject -ScriptBlock {
+                Function WaitForStatus {
+                    return @{'ReturnValue'= 0}
+                }
+                Export-ModuleMember -Variable * -Function *
+            }
+        }
+
+        Mock Stop-Service {}
+                
+        It "Should return true" {            
+            Stop-WindowsService $serviceName $timeout | Should -Be $True 
+        }
+    }
+}

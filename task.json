@@ -3,7 +3,7 @@
   "name": "StopWindowsService",
   "friendlyName": "Stop Windows Service",
   "description": "Stop a Windows Service that is running on the same machine as the agent.",
-  "author": "douglasquintanilha",
+  "author": "Stone Co.",
   "helpMarkDown": "Stop a Windows Service that is running on the same machine as the agent.",
   "category": "Utility",
   "visibility": [
@@ -13,7 +13,7 @@
   "version": {
     "Major": "0",
     "Minor": "0",
-    "Patch": "8"
+    "Patch": "9"
   },
   "minimumAgentVersion": "1.95.0",
   "instanceNameFormat": "Stop Service $(ServiceName)",

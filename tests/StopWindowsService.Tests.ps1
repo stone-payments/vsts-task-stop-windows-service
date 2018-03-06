@@ -13,7 +13,7 @@ Describe "Main" {
     Mock Trace-VstsEnteringInvocation -MockWith {}
     Mock Trace-VstsLeavingInvocation -MockWith {}
 
-    Context "Killing service" {
+    Context "Main execution" {
 
         It "When trying to stop service, it should be stopped." {
             # Arrange

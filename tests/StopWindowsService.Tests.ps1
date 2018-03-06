@@ -97,7 +97,7 @@ Describe "Main" {
 Describe "Stop-WindowsService" {
     $serviceName = "MyService"
     $timeout = "30"
-    Context "When service stopped within timeout" {        
+    Context "When the service is stopped within timeout" {        
         Mock Get-Service { 
             New-Module -AsCustomObject -ScriptBlock {
                 Function WaitForStatus {
@@ -111,6 +111,132 @@ Describe "Stop-WindowsService" {
                 
         It "Should return true" {            
             Stop-WindowsService $serviceName $timeout | Should -Be $True 
+        }
+    }
+
+    Context "When the service cannot be stopped and timeout" {        
+        Mock Get-Service { 
+            New-Module -AsCustomObject -ScriptBlock {
+                Function WaitForStatus {
+                    Throw 'Timeout reached.'
+                }
+                Export-ModuleMember -Variable * -Function *
+            }
+        }
+        Mock Write-Host {}
+
+        Mock Stop-Service {}
+                
+        It "Should return false" {            
+            Stop-WindowsService $serviceName $timeout | Should -Be $False
+        }
+        It "Should show a message about the timeout" {            
+            Assert-MockCalled Write-Host -ParameterFilter { $Object -eq "Timeout reached."}
+        }
+    }
+}
+
+Describe "Kill-WindowsService" {
+
+    Context "When the service PID cannot be found"{
+        $serviceName = "MyService"
+        Mock Get-Service {}
+        Mock New-Object {
+            New-Module -AsCustomObject -ScriptBlock {
+                Function GetPropertyValue {
+                    return 0
+                }
+                Export-ModuleMember -Variable * -Function *
+            }
+        }
+        Mock Write-Host {}
+
+        Kill-WindowsService $serviceName
+        It "Should send a message alerting about it"{
+            Assert-MockCalled Write-Host -ParameterFilter { $Object -eq "Process not found for service MyService while trying to kill it."}
+        }
+    }
+
+    Context "When the service PID can be found but the service process could not"{
+        $serviceName = "MyService"
+        Mock Get-Service {}
+        Mock Write-Host {}
+        Mock Get-Process {$null}
+        Mock New-Object {
+            New-Module -AsCustomObject -ScriptBlock {
+                Function GetPropertyValue {
+                    return -1
+                }
+                Export-ModuleMember -Variable * -Function *
+            }
+        }
+
+        Kill-WindowsService $serviceName
+        It "Should send a message alerting about it"{
+            Assert-MockCalled Write-Host -ParameterFilter { $Object -eq "Service MyService killed."}
+        }
+    }
+
+    Context "When the service PID can be found but the service process could not"{
+        $serviceName = "MyService"
+        Mock Get-Service {}
+        Mock Write-Host {}
+        Mock Get-Process {$null}
+        Mock New-Object {
+            New-Module -AsCustomObject -ScriptBlock {
+                Function GetPropertyValue {
+                    return -1
+                }
+                Export-ModuleMember -Variable * -Function *
+            }
+        }
+
+        Kill-WindowsService $serviceName
+        It "Should send a message alerting about it"{
+            Assert-MockCalled Write-Host -ParameterFilter { $Object -eq "Service MyService killed."}
+        }
+    }
+    
+    Context "When the process of the service can be found"{
+        $serviceName = "MyService"
+        Mock Get-Service {}
+        Mock Write-Host {}
+        Mock Stop-Process {}
+        Mock Get-Process {10}
+        Mock New-Object {
+            New-Module -AsCustomObject -ScriptBlock {
+                Function GetPropertyValue {
+                    return -1
+                }
+                Export-ModuleMember -Variable * -Function *
+            }
+        }
+
+        Kill-WindowsService $serviceName
+        It "Should kill the process"{
+            Assert-MockCalled Stop-Process -ParameterFilter { ($Id -eq -1 ) -and ($Force -eq $True) }
+        }
+    }
+}
+
+Describe "Test-ServiceExists" {
+    $serviceName="MyService"
+    Context "When the service exist on the machine"{
+        Mock Get-Service { @{"name"="MyServiceFullName"}}
+        Mock Write-Host {}
+        
+        It "Should return true"{
+            Test-ServiceExists $serviceName | Should -Be $True
+        }
+        It "Should print a message with the service full name, not the display name"{
+            Assert-MockCalled Write-Host -ParameterFilter { $Object -eq "Service MyServiceFullName was found." }
+        }
+    }
+
+    Context "When the service does NOT exist on the machine"{
+        Mock Get-Service { throw "Service not found."}
+        It "Should return false"{
+            Test-ServiceExists $serviceName | Should -Be $False
         }
     }
 }

@@ -85,6 +85,9 @@ function Main () {
         $timeout = Get-VstsInput -Name "Timeout" -Require
         $SkipWhenServiceDoesNotExists = Get-VstsInput -Name "SkipWhenServiceDoesNotExists" -Require
         
+        # Converting seconds to timespan
+        $stopTimeout = (New-TimeSpan -Seconds $timeout).ToString()
+
         # Whether abort when service not found.
         if(-not (Test-ServiceExists $serviceName)){
             
@@ -98,7 +101,7 @@ function Main () {
 
         # Try stop service gracefully.
         try {
-            Stop-WindowsService -serviceName $serviceName -timeout $timeout
+            Stop-WindowsService -serviceName $serviceName -timeout $stopTimeout
         } catch {
             Write-Output "Error stopping service."            
             Write-Debug $_

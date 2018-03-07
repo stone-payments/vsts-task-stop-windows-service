@@ -8,15 +8,13 @@ $srcDir = "$here\.."
 $vstsSdkPath = Join-Path $PSScriptRoot ..\ps_modules\VstsTaskSdk\VstsTaskSdk.psm1 -Resolve
 Import-Module -Name $vstsSdkPath -Prefix Vsts -ArgumentList @{ NonInteractive = $true } -Force
 
-# TODO: implement timespan conversion
-# $stopTimeout = (New-TimeSpan -Seconds $stopTimeout).ToString()
-
 Describe "Main" {
     # General mocks needed to control flow and avoid throwing errors.
     Mock Trace-VstsEnteringInvocation -MockWith {}
     Mock Trace-VstsLeavingInvocation -MockWith {}
     $serviceMockName = "some_name"
     $mockTimeout = "30"
+    $expectedTimespan = "00:00:30"
     Mock Get-VstsInput -ParameterFilter { $Name -eq "ServiceName" } -MockWith { return $serviceMockName } 
     Mock Get-VstsInput -ParameterFilter { $Name -eq "Timeout" } -MockWith { return $mockTimeout }
     Mock Get-VstsInput -ParameterFilter { $Name -eq "SkipWhenServiceDoesNotExists" } -MockWith { return "skip" }
@@ -35,9 +33,25 @@ Describe "Main" {
             Main
 
             # Assert
-            Assert-MockCalled Stop-WindowsService -ParameterFilter { ($serviceName -eq $serviceMockName) -and ($timeout -eq $mockTimeout) }
+            Assert-MockCalled Stop-WindowsService -ParameterFilter { ($serviceName -eq $serviceMockName) -and ($timeout -eq "00:00:30") }
         }
     }
+    # Cannot bind parameter 'Seconds'. Cannot convert value "benis" to type "System.Int32". Error: "Input string was not in a correct format."
+    Context "When  convert the timeout from seconds to timespan"{
+        It "Given a valid int string, it should convert it"{
+            Mock New-TimeSpan {"00:00:30"}
+            Main
+            Assert-MockCalled New-TimeSpan -ParameterFilter { ($Seconds -eq $mockTimeout) }
+        }    
+
+        It "Given an invalid string, it should throw an exception"{
+            $invalidString = "invalid_string"
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "Timeout" } -MockWith { return $invalidString }
+            {Main} | Should -Throw "Cannot process argument transformation on parameter 'Seconds'. Cannot convert value `"$invalidString`" to type `"System.Int32`". Error: `"Input string was not in a correct format.`""
+        }    
+        
+    }
+
 
     Context "When fails to stop service gracefullly" {
         Mock Test-ServiceProcessStopped -MockWith { return $false}
@@ -69,7 +83,7 @@ Describe "Main" {
             # Arrange
             Mock Get-VstsInput -ParameterFilter { $Name -eq "ServiceName" } -MockWith { return "some_name" } 
             Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return $false }
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "Timeout" } -MockWith { return "some_to" }
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "Timeout" } -MockWith { return $mockTimeout }
             Mock Get-VstsInput -ParameterFilter { $Name -eq "SkipWhenServiceDoesNotExists" } -MockWith { return $true }
             Mock Test-ServiceExists -MockWith { return $false } 
             Mock Write-Host -MockWith { }
@@ -84,7 +98,7 @@ Describe "Main" {
             # Arrange
             Mock Get-VstsInput -ParameterFilter { $Name -eq "ServiceName" } -MockWith { return "some_name" } 
             Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return $false }
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "Timeout" } -MockWith { return "some_to" }
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "Timeout" } -MockWith { return $mockTimeout }
             Mock Get-VstsInput -ParameterFilter { $Name -eq "SkipWhenServiceDoesNotExists" } -MockWith { return $false }
             Mock Test-ServiceExists -MockWith { return $false } 
 

@@ -8,59 +8,61 @@ $srcDir = "$here\.."
 $vstsSdkPath = Join-Path $PSScriptRoot ..\ps_modules\VstsTaskSdk\VstsTaskSdk.psm1 -Resolve
 Import-Module -Name $vstsSdkPath -Prefix Vsts -ArgumentList @{ NonInteractive = $true } -Force
 
+# TODO: implement timespan conversion
+# $stopTimeout = (New-TimeSpan -Seconds $stopTimeout).ToString()
+
 Describe "Main" {
     # General mocks needed to control flow and avoid throwing errors.
     Mock Trace-VstsEnteringInvocation -MockWith {}
     Mock Trace-VstsLeavingInvocation -MockWith {}
+    $serviceMockName = "some_name"
+    $mockTimeout = "30"
+    Mock Get-VstsInput -ParameterFilter { $Name -eq "ServiceName" } -MockWith { return $serviceMockName } 
+    Mock Get-VstsInput -ParameterFilter { $Name -eq "Timeout" } -MockWith { return $mockTimeout }
+    Mock Get-VstsInput -ParameterFilter { $Name -eq "SkipWhenServiceDoesNotExists" } -MockWith { return "skip" }
+    Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return $false }
+    Mock Test-ServiceExists -MockWith { return $true }
+    Mock Write-Host -MockWith {}
+    Mock Test-ServiceProcessStopped -MockWith { return $true}
+    Mock Stop-WindowsService -MockWith { }
 
-    Context "Main execution" {
+    Context "When service exists" {
+        # Arrange
+        Mock Test-ServiceExists -MockWith { return $true } 
 
-        It "When trying to stop service, it should be stopped." {
-            # Arrange
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "ServiceName" } -MockWith { return "some_name" } 
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return $false }
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "Timeout" } -MockWith { return "some_to" }
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "SkipWhenServiceDoesNotExists" } -MockWith { return "skip" }
-            Mock Test-ServiceExists -MockWith { return $true } 
-            Mock Stop-WindowsService -MockWith { return $true } 
-
+        It "Should try stop it"{
             # Act
             Main
 
             # Assert
-            Assert-MockCalled Stop-WindowsService -ParameterFilter { ($serviceName -eq "some_name") -and ($timeout -eq "some_to") }
+            Assert-MockCalled Stop-WindowsService -ParameterFilter { ($serviceName -eq $serviceMockName) -and ($timeout -eq $mockTimeout) }
         }
+    }
 
-        It "Failing to stop service, and kill flag is true, it should be killed." {
+    Context "When fails to stop service gracefullly" {
+        Mock Test-ServiceProcessStopped -MockWith { return $false}
+
+        It "Given kill flag is true, it should be killed." {
             # Arrange
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "ServiceName" } -MockWith { return "some_name" }
             Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return $true }
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "Timeout" } -MockWith { return "some_to" }
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "SkipWhenServiceDoesNotExists" } -MockWith { return "skip" }
-            Mock Test-ServiceExists -MockWith { return $true }
-            Mock Stop-WindowsService -MockWith { return $false }
-            Mock Kill-WindowsService -MockWith {}
+            $expectedPID = -1
+            Mock Get-ServiceProcessId -MockWith { return $expectedPID}
+            Mock Stop-Process -MockWith {}
 
             # Act
             Main
 
             # Assert
-            Assert-MockCalled Kill-WindowsService -ParameterFilter { $serviceName -eq "some_name" }
-
+            Assert-MockCalled Stop-Process -ParameterFilter { $Id -eq $expectedPID -and $Force}
         }
 
-        It "Failing to stop service and kill flag is false, should throw exception" {
+        It "Given kill flag is false, should throw exception" {
             # Arrange
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "ServiceName" } -MockWith { return "some_name" } 
+            Mock Get-VstsInput -ParameterFilter { $Name -eq "ServiceName" } -MockWith { return $serviceMockName } 
             Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return $false }
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "Timeout" } -MockWith { return "some_to" }
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "SkipWhenServiceDoesNotExists" } -MockWith { return "skip" }
-            Mock Test-ServiceExists -MockWith { return $true } 
-            Mock Stop-WindowsService -MockWith { return $false } 
-
-            # Act
-            # Assert
-            { Main } | Should -Throw "The service some_name could not be stopped and kill service option was disabled."
+            
+            # Act & Assert
+            { Main } | Should -Throw "The service $serviceMockName could not be stopped and kill service option was disabled."
         }
 
         It "When the service does not exists on the target machine and the skip flag is enabled, it should succeed showing a message" {
@@ -97,6 +99,26 @@ Describe "Main" {
 Describe "Stop-WindowsService" {
     $serviceName = "MyService"
     $timeout = "30"
+    Mock Write-Host -MockWith {}
+
+    It "Should call native ps stop-service" {
+        $expectedService = "test_service"
+        Mock Get-Service { 
+            New-Module -AsCustomObject -ScriptBlock {
+                Function WaitForStatus {
+                    return @{'ReturnValue'= 0}
+                }
+                Export-ModuleMember -Variable * -Function *
+            }
+        }
+        
+        Mock Stop-Service {}
+
+        Stop-WindowsService $serviceName $timeout
+
+        Assert-MockCalled Stop-Service -ParameterFilter { $Force } -Scope It
+    }
+
     Context "When the service is stopped within timeout" {        
         Mock Get-Service { 
             New-Module -AsCustomObject -ScriptBlock {
@@ -109,8 +131,8 @@ Describe "Stop-WindowsService" {
 
         Mock Stop-Service {}
                 
-        It "Should return true" {            
-            Stop-WindowsService $serviceName $timeout | Should -Be $True 
+        It "Should not throw" {            
+            {Stop-WindowsService $serviceName $timeout} | Should -Not -Throw 
         }
     }
 
@@ -123,101 +145,15 @@ Describe "Stop-WindowsService" {
                 Export-ModuleMember -Variable * -Function *
             }
         }
-        Mock Write-Host {}
 
         Mock Stop-Service {}
                 
-        It "Should return false" {            
-            Stop-WindowsService $serviceName $timeout | Should -Be $False
-        }
-        It "Should show a message about the timeout" {            
-            Assert-MockCalled Write-Host -ParameterFilter { $Object -eq "Timeout reached."}
+        It "Should throw" {            
+            { Stop-WindowsService $serviceName $timeout } | Should -Throw 'Timeout reached.'
         }
     }
 }
 
-Describe "Kill-WindowsService" {
-
-    Context "When the service PID cannot be found"{
-        $serviceName = "MyService"
-        Mock Get-Service {}
-        Mock New-Object {
-            New-Module -AsCustomObject -ScriptBlock {
-                Function GetPropertyValue {
-                    return 0
-                }
-                Export-ModuleMember -Variable * -Function *
-            }
-        }
-        Mock Write-Host {}
-
-        Kill-WindowsService $serviceName
-        It "Should send a message alerting about it"{
-            Assert-MockCalled Write-Host -ParameterFilter { $Object -eq "Process not found for service MyService while trying to kill it."}
-        }
-    }
-
-    Context "When the service PID can be found but the service process could not"{
-        $serviceName = "MyService"
-        Mock Get-Service {}
-        Mock Write-Host {}
-        Mock Get-Process {$null}
-        Mock New-Object {
-            New-Module -AsCustomObject -ScriptBlock {
-                Function GetPropertyValue {
-                    return -1
-                }
-                Export-ModuleMember -Variable * -Function *
-            }
-        }
-
-        Kill-WindowsService $serviceName
-        It "Should send a message alerting about it"{
-            Assert-MockCalled Write-Host -ParameterFilter { $Object -eq "Service MyService killed."}
-        }
-    }
-
-    Context "When the service PID can be found but the service process could not"{
-        $serviceName = "MyService"
-        Mock Get-Service {}
-        Mock Write-Host {}
-        Mock Get-Process {$null}
-        Mock New-Object {
-            New-Module -AsCustomObject -ScriptBlock {
-                Function GetPropertyValue {
-                    return -1
-                }
-                Export-ModuleMember -Variable * -Function *
-            }
-        }
-
-        Kill-WindowsService $serviceName
-        It "Should send a message alerting about it"{
-            Assert-MockCalled Write-Host -ParameterFilter { $Object -eq "Service MyService killed."}
-        }
-    }
-    
-    Context "When the process of the service can be found"{
-        $serviceName = "MyService"
-        Mock Get-Service {}
-        Mock Write-Host {}
-        Mock Stop-Process {}
-        Mock Get-Process {10}
-        Mock New-Object {
-            New-Module -AsCustomObject -ScriptBlock {
-                Function GetPropertyValue {
-                    return -1
-                }
-                Export-ModuleMember -Variable * -Function *
-            }
-        }
-
-        Kill-WindowsService $serviceName
-        It "Should kill the process"{
-            Assert-MockCalled Stop-Process -ParameterFilter { ($Id -eq -1 ) -and ($Force -eq $True) }
-        }
-    }
-}
 
 Describe "Test-ServiceExists" {
     $serviceName="MyService"

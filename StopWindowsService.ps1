@@ -2,41 +2,62 @@
 param([switch]$dotSourceOnly)
 
 function Stop-WindowsService($serviceName, $timeout) {
-    Trace-VstsEnteringInvocation $MyInvocation
     try{
+        Trace-VstsEnteringInvocation $MyInvocation
+
         $status = "Stopped"
         $service = Get-Service $serviceName
         Stop-Service $service -Force
-        try{
-            Write-Host "Stop timeout: $timeout"
-            $service.WaitForStatus($status, $timeout) | Out-Null
-            return $True
-        }catch{
-            Write-Host "Timeout reached."            
-            Write-Debug $_
-            return $False
-        }
+
+        Write-Host "Stop timeout: $timeout"
+        $service.WaitForStatus($status, $timeout) | Out-Null
     }finally{
         Trace-VstsLeavingInvocation $MyInvocation
     }
 }
 
-function Kill-WindowsService ($serviceName) {
-    Trace-VstsEnteringInvocation $MyInvocation
-    try{
+function Get-ServiceProcessId($serviceName){
+    try {
+        Trace-VstsEnteringInvocation $MyInvocation
+
         $service = Get-Service $serviceName
         $serviceObject = New-Object -TypeName "System.Management.ManagementObject" -ArgumentList "Win32_service.Name='$($service.name)'"
         $servicePid = $serviceObject.GetPropertyValue("ProcessId")
+        return $servicePid
+    }
+    finally {
+        Trace-VstsLeavingInvocation $MyInvocation
+    }
+}
+
+
+function Get-ServiceProcess($serviceName){
+    try {
+        Trace-VstsEnteringInvocation $MyInvocation
+
+        $servicePid = Get-ServiceProcessId($serviceName)
+        # 0 (zero) is an invalid PID returned because is the .net int default value.
         if($servicePid -ne 0) {
-            if(Get-Process -Id $servicePid){
-                Write-Host "Process $servicePid still running, killing it..."
-                Stop-Process $servicePid -Force
-            }
-            Write-Host "Service $serviceName killed."
+            $ServiceProcess = Get-Process -Id $servicePid
+            return $ServiceProcess
         }else{
-            Write-Host "Process not found for service $serviceName while trying to kill it."
+            throw "Process PID cannot be 0"
         }    
-    }finally{
+    } finally {
+        Trace-VstsLeavingInvocation $MyInvocation
+    }
+}
+
+function Test-ServiceProcessStopped($serviceName){
+    try{
+        Trace-VstsEnteringInvocation $MyInvocation
+
+        Get-ServiceProcess $serviceName
+        return $False
+    }catch{
+        Write-Debug $_
+        return $True
+    } finally{
         Trace-VstsLeavingInvocation $MyInvocation
     }
 }
@@ -55,16 +76,16 @@ function Test-ServiceExists($serviceName) {
 }
 
 function Main () {
-    # For more information on the VSTS Task SDK:
-    # https://github.com/Microsoft/vsts-task-lib
     Trace-VstsEnteringInvocation $MyInvocation
     try {
-        
+
+        # Read form input.
         $serviceName = Get-VstsInput -Name "ServiceName" -Require
         $shouldKillService = Get-VstsInput -Name "KillService" -Require
         $timeout = Get-VstsInput -Name "Timeout" -Require
         $SkipWhenServiceDoesNotExists = Get-VstsInput -Name "SkipWhenServiceDoesNotExists" -Require
-               
+        
+        # Whether abort when service not found.
         if(-not (Test-ServiceExists $serviceName)){
             
             if($SkipWhenServiceDoesNotExists){
@@ -75,19 +96,31 @@ function Main () {
             }            
         }
 
-        $serviceStopped = Stop-WindowsService -serviceName $serviceName -timeout $timeout
-            
-        if($serviceStopped){
-            Write-Host "Service $serviceName stopped successfully."
-        }else{
-            if($shouldKillService){                    
-                Kill-WindowsService $serviceName
-            }else{
-                throw "The service $serviceName could not be stopped and kill service option was disabled."
-            }
+        # Try stop service gracefully.
+        try {
+            Stop-WindowsService -serviceName $serviceName -timeout $timeout
+        } catch {
+            Write-Output "Error stopping service."            
+            Write-Debug $_
         }
         
-        
+        # Check if service process exited.
+        if(Test-ServiceProcessStopped $serviceName){
+            Write-Host "Service $serviceName stopped successfully."
+            return
+        }
+
+        # Service process still alive.
+        if($shouldKillService) {
+            # Forcedly kill process.
+            $servicePid = Get-ServiceProcessId $serviceName            
+            Write-Host "Process $servicePid still running, killing it..."        
+            Stop-Process $servicePid -Force
+            Write-Host "Process of the service $serviceName killed."
+            return
+        }else{
+            throw "The service $serviceName could not be stopped and kill service option was disabled."
+        }
     } finally {
         Trace-VstsLeavingInvocation $MyInvocation
     }

@@ -21,9 +21,8 @@ Describe "Main" {
     Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return $false }
     Mock Test-ServiceExists -MockWith { return $true }
     Mock Write-Host -MockWith {}
-    Mock Test-ServiceProcessStopped -MockWith { return $true}
     Mock Stop-WindowsService -MockWith { }
-
+    Mock Get-ServiceProcessId -MockWith { return $false }
     Context "When service exists" {
         # Arrange
         Mock Test-ServiceExists -MockWith { return $true } 
@@ -54,13 +53,13 @@ Describe "Main" {
 
 
     Context "When fails to stop service gracefullly" {
-        Mock Test-ServiceProcessStopped -MockWith { return $false}
+        Mock Get-Process -MockWith { return $true }
+        $expectedPID = -1
+        Mock Get-ServiceProcessId -MockWith { return $expectedPID}
 
         It "Given kill flag is true, it should be killed." {
             # Arrange
             Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return $true }
-            $expectedPID = -1
-            Mock Get-ServiceProcessId -MockWith { return $expectedPID}
             Mock Stop-Process -MockWith {}
 
             # Act

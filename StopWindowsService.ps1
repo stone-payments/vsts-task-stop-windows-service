@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param([switch]$dotSourceOnly)
 
+# 0 (zero) is an invalid PID returned by ServiceProcess class because is the .net int default value.
+$INVALID_PID = 0
 function Stop-WindowsService($serviceName, $timeout) {
     try{
         Trace-VstsEnteringInvocation $MyInvocation
@@ -26,38 +28,6 @@ function Get-ServiceProcessId($serviceName){
         return $servicePid
     }
     finally {
-        Trace-VstsLeavingInvocation $MyInvocation
-    }
-}
-
-
-function Get-ServiceProcess($serviceName){
-    try {
-        Trace-VstsEnteringInvocation $MyInvocation
-
-        $servicePid = Get-ServiceProcessId($serviceName)
-        # 0 (zero) is an invalid PID returned because is the .net int default value.
-        if($servicePid -ne 0) {
-            $ServiceProcess = Get-Process -Id $servicePid
-            return $ServiceProcess
-        }else{
-            throw "Process PID cannot be 0"
-        }    
-    } finally {
-        Trace-VstsLeavingInvocation $MyInvocation
-    }
-}
-
-function Test-ServiceProcessStopped($serviceName){
-    try{
-        Trace-VstsEnteringInvocation $MyInvocation
-
-        Get-ServiceProcess $serviceName
-        return $False
-    }catch{
-        Write-Debug $_
-        return $True
-    } finally{
         Trace-VstsLeavingInvocation $MyInvocation
     }
 }
@@ -99,6 +69,9 @@ function Main () {
             }            
         }
 
+        # Get service process PID before try stop it to ensure wmi return non-zero value (basically avoid wmi bug).
+        $servicePid = Get-ServiceProcessId $serviceName
+
         # Try stop service gracefully.
         try {
             Stop-WindowsService -serviceName $serviceName -timeout $stopTimeout
@@ -106,23 +79,21 @@ function Main () {
             Write-Output "Error stopping service."            
             Write-Debug $_
         }
-        
+
         # Check if service process exited.
-        if(Test-ServiceProcessStopped $serviceName){
-            Write-Host "Service $serviceName stopped successfully."
-            return
+        if($servicePid -ne $INVALID_PID -and (Get-Process -Id $servicePid -ErrorAction Continue)){
+            $processStillRunning = $true
         }
 
         # Service process still alive.
-        if($shouldKillService) {
-            # Forcedly kill process.
-            $servicePid = Get-ServiceProcessId $serviceName            
-            Write-Host "Process $servicePid still running, killing it..."        
-            Stop-Process $servicePid -Force
-            Write-Host "Process of the service $serviceName killed."
-            return
-        }else{
-            throw "The service $serviceName could not be stopped and kill service option was disabled."
+        if($processStillRunning){
+            if($shouldKillService) {
+                Write-Host "Service Process PID:$servicePid still running, killing it..."
+                Stop-Process -Id $servicePid -Force -ErrorAction Continue
+                Write-Host "Process of the service $serviceName killed."
+            } else {
+                throw "The service $serviceName could not be stopped and kill service option was disabled."
+            }
         }
     } finally {
         Trace-VstsLeavingInvocation $MyInvocation

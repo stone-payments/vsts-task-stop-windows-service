@@ -81,7 +81,7 @@ function Main () {
         }
 
         # Check if service process exited.
-        if($servicePid -ne $INVALID_PID -and (Get-Process -Id $servicePid -ErrorAction Continue)){
+        if($servicePid -ne $INVALID_PID -and (Get-Process -Id $servicePid -ErrorAction SilentlyContinue)){
             $processStillRunning = $true
         }
 

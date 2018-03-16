@@ -12,8 +12,8 @@
   "demands": [],
   "version": {
     "Major": "0",
-    "Minor": "0",
-    "Patch": "9"
+    "Minor": "1",
+    "Patch": "10"
   },
   "minimumAgentVersion": "1.95.0",
   "instanceNameFormat": "Stop Service $(ServiceName)",
@@ -53,11 +53,11 @@
     {
       "name": "KillService",
       "type": "boolean",
-      "label": "Kill service if stop fails",
+      "label": "Kill service process if not gracefully exited",
       "defaultValue": true,      
       "required": false,
       "groupName": "Advanced",
-      "helpMarkDown": "Select this option for force terminate the service if the stop fails."
+      "helpMarkDown": "Select this option for force terminate the service process if still running after service stop."
     }
   ],
   "execution": {

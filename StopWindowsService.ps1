@@ -19,8 +19,8 @@ function Stop-WindowsService($serviceName, $timeout) {
 }
 
 function Get-ServiceProcessId($serviceName){
+    Trace-VstsEnteringInvocation $MyInvocation
     try {
-        Trace-VstsEnteringInvocation $MyInvocation
 
         $service = Get-Service $serviceName
         $serviceObject = New-Object -TypeName "System.Management.ManagementObject" -ArgumentList "Win32_service.Name='$($service.name)'"

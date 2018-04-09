@@ -51,9 +51,9 @@ function Main () {
 
         # Read form input.
         $serviceName = Get-VstsInput -Name "ServiceName" -Require
-        $shouldKillService = Get-VstsInput -Name "KillService" -Require
+        $shouldKillService = Get-VstsInput -Name "KillService" -Require -AsBool
         $timeout = Get-VstsInput -Name "Timeout" -Require
-        $SkipWhenServiceDoesNotExists = Get-VstsInput -Name "SkipWhenServiceDoesNotExists" -Require
+        $SkipWhenServiceDoesNotExists = Get-VstsInput -Name "SkipWhenServiceDoesNotExists" -Require -AsBool
         
         # Converting seconds to timespan
         $stopTimeout = (New-TimeSpan -Seconds $timeout).ToString()

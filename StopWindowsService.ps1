@@ -65,7 +65,7 @@ function Main () {
                 Write-Host "The service $serviceName does not exist. Skipping this task."
                 return
             }else{
-                throw "The service $serviceName does not exist. Please check the service name on the task configuration."
+                throw "The service $serviceName does not exist. Please check the service name on the task configuration. If it is the first install and you wish to continue the deploy please check the skip checkbox on the advanced tab."
             }            
         }
 

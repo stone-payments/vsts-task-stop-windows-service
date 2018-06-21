@@ -91,7 +91,17 @@ function Main () {
                 Write-Host "Service Process PID:$servicePid still running, killing it..."
                 Stop-Process -Id $servicePid -Force -ErrorAction Continue
                 Write-Host "Process of the service $serviceName killed."
-            } else {
+            } else {                
+                while(Get-Process -Id $servicePid -ErrorAction Ignore){                    
+                    Write-Host "Waiting process to end."
+                    Start-Sleep -Seconds 1
+                    $timeout = ($timeout - 1)
+                    if($timeout -eq 0){
+                        break;
+                    }
+                }
+            }
+            if(Get-Process -Id $servicePid -ErrorAction Ignore){
                 throw "The service $serviceName could not be stopped and kill service option was disabled."
             }
         }

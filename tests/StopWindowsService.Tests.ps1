@@ -56,18 +56,25 @@ Describe "Main" {
         Mock Get-Process -MockWith { return $true }
         $expectedPID = -1
         Mock Get-ServiceProcessId -MockWith { return $expectedPID}
+        Mock Start-Sleep -MockWith {}
+        Mock FailIfProcessStillRunning -MockWith {}
+        Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return $true }
+        Mock Stop-Process -MockWith {}
 
         It "Given kill flag is true, it should be killed." {
-            # Arrange
-            Mock Get-VstsInput -ParameterFilter { $Name -eq "KillService" } -MockWith { return $true }
-            Mock Stop-Process -MockWith {}
-
             # Act
             Main
 
             # Assert
             Assert-MockCalled Stop-Process -ParameterFilter { $Id -eq $expectedPID -and $Force}
         }
+    }
+
+    Context "When fails to stop service gracefullly 2" {
+        Mock Get-Process -MockWith { return $true }
+        $expectedPID = -1
+        Mock Get-ServiceProcessId -MockWith { return $expectedPID}
+        Mock Start-Sleep -MockWith {}
 
         It "Given kill flag is false, should throw exception" {
             # Arrange

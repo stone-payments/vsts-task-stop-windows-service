@@ -45,6 +45,12 @@ function Test-ServiceExists($serviceName) {
     }
 }
 
+function FailIfProcessStillRunning ($servicePid, $serviceName) {
+    if(Get-Process -Id $servicePid -ErrorAction Ignore -Verbose){
+        throw "The service $serviceName could not be stopped and kill service option was disabled."
+    }
+}
+
 function Main () {
     Trace-VstsEnteringInvocation $MyInvocation
     try {
@@ -101,9 +107,8 @@ function Main () {
                     }
                 }
             }
-            if(Get-Process -Id $servicePid -ErrorAction Ignore){
-                throw "The service $serviceName could not be stopped and kill service option was disabled."
-            }
+
+            FailIfProcessStillRunning $servicePid $serviceName
         }
     } finally {
         Trace-VstsLeavingInvocation $MyInvocation
